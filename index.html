@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Retrospective App</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>Sprint Retrospective (Beta) </h1>
+  <div class="button-container">
+    <button id="downloadBtn">📥 Download Board</button>
+    <button id="jiraBtn">📋 Export JIRA Markup</button>
+  </div>
+  <div class="board">
+    <div class="column" id="went-well">
+      <h2>✅ Went Well</h2>
+      <ul id="list-went-well"></ul>
+      <form data-category="went-well"><textarea placeholder="Add item" rows="2"></textarea><button>Add</button></form>
+    </div>
+    <div class="column" id="didnt-go-well">
+      <h2>❌ Didn't Go Well</h2>
+      <ul id="list-didnt-go-well"></ul>
+      <form data-category="didnt-go-well"><textarea placeholder="Add item" rows="2"></textarea><button>Add</button></form>
+    </div>
+    <div class="column" id="ideas">
+      <h2>💡 Ideas</h2>
+      <ul id="list-ideas"></ul>
+      <form data-category="ideas"><textarea placeholder="Add item" rows="2"></textarea><button>Add</button></form>
+    </div>
+    <div class="column" id="action-items">
+      <h2>🛠 Action Items</h2>
+      <ul id="list-action-items"></ul>
+      <form data-category="action-items"><textarea placeholder="Add item" rows="2"></textarea><button>Add</button></form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+  <script src="script.js"></script>
+</body>
+</html>

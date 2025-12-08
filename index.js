@@ -72,7 +72,7 @@ app.get("/export", (req, res) => {
 
 app.get("/export/jira", (req, res) => {
   const data = readDB();
-  
+
   const grouped = {
     'went-well': [],
     'didnt-go-well': [],
@@ -88,17 +88,16 @@ app.get("/export/jira", (req, res) => {
 
   let jiraMarkup = "h1. Sprint Retrospective\n\n";
 
-  // Create three-column table
+  // Create three-column table with bullet lists in each cell
   jiraMarkup += "||Went Well||Didn't Go Well||Ideas||\n";
-  
-  const maxRows = Math.max(grouped['went-well'].length, grouped['didnt-go-well'].length, grouped['ideas'].length);
-  
-  for (let i = 0; i < maxRows; i++) {
-    const wentWell = grouped['went-well'][i] ? grouped['went-well'][i].text : "";
-    const didntGoWell = grouped['didnt-go-well'][i] ? grouped['didnt-go-well'][i].text : "";
-    const ideas = grouped['ideas'][i] ? grouped['ideas'][i].text : "";
-    jiraMarkup += `|${wentWell}|${didntGoWell}|${ideas}|\n`;
-  }
+
+  // Build bullet lists for each column
+  const wentWellList = grouped['went-well'].map(item => `* ${item.text}`).join('\n');
+  const didntGoWellList = grouped['didnt-go-well'].map(item => `* ${item.text}`).join('\n');
+  const ideasList = grouped['ideas'].map(item => `* ${item.text}`).join('\n');
+
+  // Create single row with all items as bullets in each cell
+  jiraMarkup += `|${wentWellList || ' '}|${didntGoWellList || ' '}|${ideasList || ' '}|\n`;
 
   // Add action items as bullet list below the table
   if (grouped['action-items'].length > 0) {

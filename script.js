@@ -53,8 +53,11 @@ async function loadItems() {
         const editBtn = document.createElement('button');
         editBtn.textContent = '✏️';
         editBtn.addEventListener('click', () => {
-          const input = document.createElement('input');
+          const input = document.createElement('textarea');
           input.value = item.text;
+          input.rows = 3;
+          input.style.width = '100%';
+          input.style.resize = 'vertical';
           const saveBtn = document.createElement('button');
           saveBtn.textContent = '💾';
           li.innerHTML = '';

@@ -60,9 +60,9 @@ function setupCopySessionId() {
 }
 
 
-async function loadItems() {
-  // Don't refresh if user is editing
-  if (isEditing) return;
+async function loadItems(force = false) {
+  // Don't refresh if user is editing (unless forced)
+  if (isEditing && !force) return;
 
   const res = await fetch(`/api/session/${sessionId}/feedback`);
   const data = await res.json();
@@ -108,7 +108,7 @@ async function loadItems() {
         else voted.splice(voted.indexOf(item.id), 1);
         localStorage.setItem('votedItems', JSON.stringify(voted));
         voteBtn.style.backgroundColor = action === 'up' ? '#d4edda' : '';
-        loadItems(); // refresh sorted list
+        loadItems(true); // force refresh even if editing
       });
 
       li.appendChild(text);
@@ -117,8 +117,17 @@ async function loadItems() {
       if (owned.includes(item.id)) {
         const editBtn = document.createElement('button');
         editBtn.textContent = '✏️';
+        editBtn.classList.add('edit-btn'); // Add class for tracking
         editBtn.addEventListener('click', () => {
           isEditing = true; // Pause auto-refresh
+
+          // Disable all other edit buttons
+          document.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+          });
+
           const input = document.createElement('textarea');
           input.value = item.text;
           input.rows = 3;
@@ -150,12 +159,12 @@ async function loadItems() {
               body: JSON.stringify({ newText })
             });
             isEditing = false; // Resume auto-refresh
-            loadItems();
+            loadItems(true); // force refresh (will re-enable all buttons)
           });
 
           cancelBtn.addEventListener('click', () => {
             isEditing = false; // Resume auto-refresh
-            loadItems();
+            loadItems(true); // force refresh (will re-enable all buttons)
           });
         });
 
@@ -164,7 +173,7 @@ async function loadItems() {
         delBtn.addEventListener('click', async () => {
           if (confirm('Delete this item?')) {
             await fetch(`/api/session/${sessionId}/feedback/${item.id}`, { method: 'DELETE' });
-            loadItems();
+            loadItems(true); // force refresh even if editing
           }
         });
 
@@ -193,7 +202,7 @@ async function loadItems() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ newCategory })
           }).then(() => {
-            loadItems(); // Refresh to ensure consistency
+            loadItems(true); // force refresh even if editing
           });
         } else {
           // Just reordering within same category
@@ -203,6 +212,7 @@ async function loadItems() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ newOrder })
           });
+          // No need to refresh for reordering as it's already visually updated
         }
       }
     });
@@ -245,7 +255,7 @@ function setupFormSubmission() {
         owned.push(result.id);
         localStorage.setItem('ownedItems', JSON.stringify(owned));
         input.value = '';
-        loadItems();
+        loadItems(true); // force refresh even if editing another item
       } catch (err) {
         console.error('Error adding item:', err);
         alert('Failed to add item: ' + err.message);

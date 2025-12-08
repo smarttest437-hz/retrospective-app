@@ -1,13 +1,26 @@
 body {
   font-family: sans-serif;
-  background: #f4f4f4;
+  background: linear-gradient(135deg, #1e5aa8 0%, #2d7dd2 50%, #59b0e8 100%);
+  min-height: 100vh;
   padding: 1rem;
 }
 h1 {
   text-align: center;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 button {
   cursor: pointer;
+  background: #1e5aa8;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: background 0.3s;
+}
+button:hover {
+  background: #2d7dd2;
 }
 .board {
   display: flex;

@@ -4,39 +4,177 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Retrospective App</title>
-  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      font-family: sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+    .container {
+      background: white;
+      padding: 3rem;
+      border-radius: 20px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      max-width: 500px;
+      width: 100%;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+    }
+    .section {
+      margin-bottom: 2rem;
+    }
+    .section h2 {
+      font-size: 1.2rem;
+      color: #444;
+      margin-bottom: 1rem;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.8rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+      box-sizing: border-box;
+      transition: border-color 0.3s;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    button {
+      width: 100%;
+      padding: 1rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .secondary-btn {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    .divider {
+      text-align: center;
+      margin: 2rem 0;
+      color: #999;
+      position: relative;
+    }
+    .divider::before,
+    .divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 1px;
+      background: #e0e0e0;
+    }
+    .divider::before {
+      left: 0;
+    }
+    .divider::after {
+      right: 0;
+    }
+    .error {
+      color: #f5576c;
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+      display: none;
+    }
+  </style>
 </head>
 <body>
-  <h1>Sprint Retrospective (Beta) </h1>
-  <div class="button-container">
-    <button id="downloadBtn">📥 Download Board</button>
-    <button id="jiraBtn">📋 Export JIRA Markup</button>
-  </div>
-  <div class="board">
-    <div class="column" id="went-well">
-      <h2>✅ Went Well</h2>
-      <ul id="list-went-well"></ul>
-      <form data-category="went-well"><textarea placeholder="Add item" rows="2"></textarea><button>Add</button></form>
+  <div class="container">
+    <h1>🚀 Sprint Retrospective</h1>
+    <p class="subtitle">Create a new retrospective or join an existing one</p>
+
+    <div class="section">
+      <h2>Create New Retrospective</h2>
+      <input type="text" id="sessionName" placeholder="Enter retrospective name (optional)" />
+      <button id="createBtn">Create New Session</button>
     </div>
-    <div class="column" id="didnt-go-well">
-      <h2>❌ Didn't Go Well</h2>
-      <ul id="list-didnt-go-well"></ul>
-      <form data-category="didnt-go-well"><textarea placeholder="Add item" rows="2"></textarea><button>Add</button></form>
-    </div>
-    <div class="column" id="ideas">
-      <h2>💡 Ideas</h2>
-      <ul id="list-ideas"></ul>
-      <form data-category="ideas"><textarea placeholder="Add item" rows="2"></textarea><button>Add</button></form>
-    </div>
-    <div class="column" id="action-items">
-      <h2>🛠 Action Items</h2>
-      <ul id="list-action-items"></ul>
-      <form data-category="action-items"><textarea placeholder="Add item" rows="2"></textarea><button>Add</button></form>
+
+    <div class="divider">OR</div>
+
+    <div class="section">
+      <h2>Join Existing Retrospective</h2>
+      <input type="text" id="sessionId" placeholder="Enter session ID" />
+      <button id="joinBtn" class="secondary-btn">Join Session</button>
+      <div class="error" id="error">Session not found. Please check the ID and try again.</div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script>
+    document.getElementById('createBtn').addEventListener('click', async () => {
+      const name = document.getElementById('sessionName').value.trim();
+      try {
+        const res = await fetch('/api/session/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (data.success) {
+          window.location.href = `/session/${data.sessionId}`;
+        }
+      } catch (err) {
+        console.error('Error creating session:', err);
+      }
+    });
 
-  <script src="script.js"></script>
+    document.getElementById('joinBtn').addEventListener('click', async () => {
+      const sessionId = document.getElementById('sessionId').value.trim();
+      const errorDiv = document.getElementById('error');
+      errorDiv.style.display = 'none';
+
+      if (!sessionId) {
+        errorDiv.textContent = 'Please enter a session ID';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/session/${sessionId}`);
+        if (res.ok) {
+          window.location.href = `/session/${sessionId}`;
+        } else {
+          errorDiv.style.display = 'block';
+        }
+      } catch (err) {
+        errorDiv.style.display = 'block';
+      }
+    });
+
+    // Allow Enter key to submit
+    document.getElementById('sessionName').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') document.getElementById('createBtn').click();
+    });
+    document.getElementById('sessionId').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') document.getElementById('joinBtn').click();
+    });
+  </script>
 </body>
 </html>

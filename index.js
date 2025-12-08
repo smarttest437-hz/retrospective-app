@@ -1,26 +1,74 @@
 const express = require("express");
 const fs = require("fs");
+const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_FILE = "./db.json";
 
-app.use(express.static("."));
 app.use(express.json());
 
 function readDB() {
-  if (!fs.existsSync(DB_FILE)) return [];
-  return JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
+  if (!fs.existsSync(DB_FILE)) return { sessions: {} };
+  const data = JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
+  // Migrate old format to new format if needed
+  if (Array.isArray(data)) {
+    return { sessions: {} };
+  }
+  return data;
 }
 function writeDB(data) {
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
-app.get("/feedback", (req, res) => {
-  res.json(readDB());
+function generateSessionId() {
+  return Math.random().toString(36).substring(2, 8);
+}
+
+// Session management routes
+app.post("/api/session/create", (req, res) => {
+  const { name } = req.body;
+  const sessionId = generateSessionId();
+  const db = readDB();
+  db.sessions[sessionId] = {
+    id: sessionId,
+    name: name || `Retrospective ${sessionId}`,
+    createdAt: new Date().toISOString(),
+    items: []
+  };
+  writeDB(db);
+  res.json({ success: true, sessionId });
 });
 
-app.post("/feedback", (req, res) => {
+app.get("/api/session/:sessionId", (req, res) => {
+  const { sessionId } = req.params;
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) {
+    return res.status(404).json({ error: "Session not found" });
+  }
+  res.json(session);
+});
+
+// Get all feedback for a session
+app.get("/api/session/:sessionId/feedback", (req, res) => {
+  const { sessionId } = req.params;
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) {
+    return res.status(404).json({ error: "Session not found" });
+  }
+  res.json(session.items || []);
+});
+
+// Add feedback to a session
+app.post("/api/session/:sessionId/feedback", (req, res) => {
+  const { sessionId } = req.params;
   const { category, text } = req.body;
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) {
+    return res.status(404).json({ error: "Session not found" });
+  }
   const newItem = {
     id: Date.now(),
     category,
@@ -28,50 +76,70 @@ app.post("/feedback", (req, res) => {
     votes: 0,
     createdAt: new Date().toISOString(),
   };
-  const data = readDB();
-  data.push(newItem);
-  writeDB(data);
+  session.items.push(newItem);
+  writeDB(db);
   res.json({ success: true, id: newItem.id });
 });
 
-app.post("/vote/:id", (req, res) => {
+// Vote on an item in a session
+app.post("/api/session/:sessionId/vote/:id", (req, res) => {
+  const { sessionId } = req.params;
   const id = Number(req.params.id);
   const { action } = req.body;
-  const data = readDB();
-  const index = data.findIndex((i) => i.id === id);
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+  const index = session.items.findIndex((i) => i.id === id);
   if (index === -1) return res.status(404).json({ error: "Not found" });
-  if (action === "up") data[index].votes += 1;
-  if (action === "down" && data[index].votes > 0) data[index].votes -= 1;
-  writeDB(data);
-  res.json({ success: true, votes: data[index].votes });
+  if (action === "up") session.items[index].votes += 1;
+  if (action === "down" && session.items[index].votes > 0) session.items[index].votes -= 1;
+  writeDB(db);
+  res.json({ success: true, votes: session.items[index].votes });
 });
 
-app.post("/edit/:id", (req, res) => {
+// Edit an item in a session
+app.post("/api/session/:sessionId/edit/:id", (req, res) => {
+  const { sessionId } = req.params;
   const id = Number(req.params.id);
   const { newText } = req.body;
-  const data = readDB();
-  const index = data.findIndex((i) => i.id === id);
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+  const index = session.items.findIndex((i) => i.id === id);
   if (index === -1) return res.status(404).json({ error: "Not found" });
-  data[index].text = newText;
-  writeDB(data);
+  session.items[index].text = newText;
+  writeDB(db);
   res.json({ success: true });
 });
 
-app.delete("/feedback/:id", (req, res) => {
+// Delete an item from a session
+app.delete("/api/session/:sessionId/feedback/:id", (req, res) => {
+  const { sessionId } = req.params;
   const id = Number(req.params.id);
-  const data = readDB();
-  const newData = data.filter((i) => i.id !== id);
-  writeDB(newData);
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+  session.items = session.items.filter((i) => i.id !== id);
+  writeDB(db);
   res.json({ success: true });
 });
 
-app.get("/export", (req, res) => {
-  const data = readDB();
-  res.json(data);
+// Export session data
+app.get("/api/session/:sessionId/export", (req, res) => {
+  const { sessionId } = req.params;
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+  res.json(session.items || []);
 });
 
-app.get("/export/jira", (req, res) => {
-  const data = readDB();
+// Export session to JIRA markup
+app.get("/api/session/:sessionId/export/jira", (req, res) => {
+  const { sessionId } = req.params;
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+  const data = session.items || [];
 
   const grouped = {
     'went-well': [],
@@ -112,29 +180,44 @@ app.get("/export/jira", (req, res) => {
   res.send(jiraMarkup);
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
-
-app.post("/move/:id", (req, res) => {
+// Move item to different category in a session
+app.post("/api/session/:sessionId/move/:id", (req, res) => {
+  const { sessionId } = req.params;
   const id = Number(req.params.id);
   const { newCategory } = req.body;
-  const data = readDB();
-  const index = data.findIndex((i) => i.id === id);
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+  const index = session.items.findIndex((i) => i.id === id);
   if (index === -1) return res.status(404).json({ error: "Not found" });
-  data[index].category = newCategory;
-  writeDB(data);
+  session.items[index].category = newCategory;
+  writeDB(db);
   res.json({ success: true });
 });
 
-app.post("/reorder/:category", (req, res) => {
-  const { category } = req.params;
+// Reorder items within a category in a session
+app.post("/api/session/:sessionId/reorder/:category", (req, res) => {
+  const { sessionId, category } = req.params;
   const { newOrder } = req.body;
-  const data = readDB();
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
 
-  const unchanged = data.filter((item) => item.category !== category);
-  const reordered = newOrder.map((id) => data.find((item) => item.id === id));
-  const updated = [...unchanged, ...reordered];
-  writeDB(updated);
+  const unchanged = session.items.filter((item) => item.category !== category);
+  const reordered = newOrder.map((id) => session.items.find((item) => item.id === id));
+  session.items = [...unchanged, ...reordered];
+  writeDB(db);
   res.json({ success: true });
+});
+
+// Serve board.html for session URLs
+app.get("/session/:sessionId", (req, res) => {
+  res.sendFile(path.join(__dirname, "board.html"));
+});
+
+// Serve static files
+app.use(express.static("."));
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });

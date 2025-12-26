@@ -24,7 +24,59 @@ function generateSessionId() {
   return Math.random().toString(36).substring(2, 8);
 }
 
+// Admin code from environment variable (default: admin437)
+const ADMIN_CODE = process.env.ADMIN_CODE || "admin437";
+
 // Session management routes
+
+// Verify admin code
+app.post("/api/admin/verify", (req, res) => {
+  const { code } = req.body;
+  if (code === ADMIN_CODE) {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ success: false, error: "Invalid admin code" });
+  }
+});
+
+// Get all sessions (requires admin code)
+app.post("/api/sessions", (req, res) => {
+  const { adminCode } = req.body;
+
+  if (adminCode !== ADMIN_CODE) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const db = readDB();
+  const sessions = Object.values(db.sessions || {}).map(session => ({
+    id: session.id,
+    name: session.name,
+    createdAt: session.createdAt,
+    itemCount: (session.items || []).length
+  }));
+  // Sort by creation date, newest first
+  sessions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.json(sessions);
+});
+
+// Delete a session (requires admin code)
+app.delete("/api/session/:sessionId", (req, res) => {
+  const { sessionId } = req.params;
+  const adminCode = req.headers['x-admin-code'];
+
+  if (adminCode !== ADMIN_CODE) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const db = readDB();
+  if (!db.sessions[sessionId]) {
+    return res.status(404).json({ error: "Session not found" });
+  }
+  delete db.sessions[sessionId];
+  writeDB(db);
+  res.json({ success: true });
+});
+
 app.post("/api/session/create", (req, res) => {
   const { name } = req.body;
   const sessionId = generateSessionId();
@@ -33,7 +85,14 @@ app.post("/api/session/create", (req, res) => {
     id: sessionId,
     name: name || `Retrospective ${sessionId}`,
     createdAt: new Date().toISOString(),
-    items: []
+    items: [],
+    timer: {
+      duration: 0,
+      startTime: null,
+      pausedAt: null,
+      remainingSeconds: null,
+      state: 'stopped'
+    }
   };
   writeDB(db);
   res.json({ success: true, sessionId });
@@ -208,6 +267,108 @@ app.post("/api/session/:sessionId/reorder/:category", (req, res) => {
   session.items = [...unchanged, ...reordered];
   writeDB(db);
   res.json({ success: true });
+});
+
+// Timer endpoints
+
+// Start timer
+app.post("/api/session/:sessionId/timer/start", (req, res) => {
+  const { sessionId } = req.params;
+  const { duration } = req.body;
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+
+  // Validate duration (1 second to 2 hours)
+  if (!duration || duration < 1 || duration > 7200) {
+    return res.status(400).json({ error: "Duration must be between 1 and 7200 seconds" });
+  }
+
+  session.timer = {
+    duration: duration,
+    startTime: new Date().toISOString(),
+    pausedAt: null,
+    remainingSeconds: null,
+    state: 'running'
+  };
+
+  writeDB(db);
+  res.json({ success: true, timer: session.timer });
+});
+
+// Pause timer
+app.post("/api/session/:sessionId/timer/pause", (req, res) => {
+  const { sessionId } = req.params;
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+
+  const timer = session.timer;
+  if (!timer || timer.state !== 'running') {
+    return res.status(400).json({ error: "Timer is not running" });
+  }
+
+  // Calculate remaining seconds
+  const now = Date.now();
+  const startTime = new Date(timer.startTime).getTime();
+  const elapsed = Math.floor((now - startTime) / 1000);
+  const remaining = Math.max(0, timer.duration - elapsed);
+
+  // If already expired, set state to expired instead
+  if (remaining <= 0) {
+    timer.state = 'expired';
+    timer.remainingSeconds = 0;
+  } else {
+    timer.state = 'paused';
+    timer.remainingSeconds = remaining;
+  }
+
+  timer.pausedAt = new Date().toISOString();
+
+  writeDB(db);
+  res.json({ success: true, timer: session.timer });
+});
+
+// Resume timer
+app.post("/api/session/:sessionId/timer/resume", (req, res) => {
+  const { sessionId } = req.params;
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+
+  const timer = session.timer;
+  if (!timer || timer.state !== 'paused') {
+    return res.status(400).json({ error: "Timer is not paused" });
+  }
+
+  // Use remaining seconds as new duration
+  timer.duration = timer.remainingSeconds;
+  timer.startTime = new Date().toISOString();
+  timer.pausedAt = null;
+  timer.remainingSeconds = null;
+  timer.state = 'running';
+
+  writeDB(db);
+  res.json({ success: true, timer: session.timer });
+});
+
+// Reset timer
+app.post("/api/session/:sessionId/timer/reset", (req, res) => {
+  const { sessionId } = req.params;
+  const db = readDB();
+  const session = db.sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+
+  session.timer = {
+    duration: 0,
+    startTime: null,
+    pausedAt: null,
+    remainingSeconds: null,
+    state: 'stopped'
+  };
+
+  writeDB(db);
+  res.json({ success: true, timer: session.timer });
 });
 
 // Serve board.html for session URLs

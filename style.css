@@ -81,3 +81,58 @@ textarea {
   resize: vertical;
   font-family: sans-serif;
 }
+
+/* Timer Styles */
+
+/* Timer pulse animation for expired state - enhanced red flashing */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    background: rgba(255, 0, 0, 0.3);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+    background: rgba(255, 0, 0, 0.5);
+  }
+}
+
+#timerDisplay {
+  transition: color 0.3s ease, background 0.3s ease;
+  letter-spacing: 0.1em;
+}
+
+#timerDurationInput {
+  font-size: 1rem;
+  text-align: center;
+}
+
+#timerDurationInput:focus {
+  outline: 2px solid #2d7dd2;
+  border-color: #1e5aa8;
+}
+
+#timerControls button {
+  margin: 0 0.25rem;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  #timerDisplay {
+    font-size: 2rem !important;
+    min-width: 150px !important;
+  }
+
+  #timerControls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  #timerControls button,
+  #timerDurationInput {
+    width: 200px;
+  }
+}

@@ -125,9 +125,232 @@
       <button id="joinBtn" class="secondary-btn">Join Session</button>
       <div class="error" id="error">Session not found. Please check the ID and try again.</div>
     </div>
+
+    <div class="divider">Previous Sessions (Admin)</div>
+
+    <div class="section">
+      <button id="adminLoginBtn" class="secondary-btn" style="width: 100%;">
+        🔒 View Previous Sessions
+      </button>
+      <div id="sessionsList" style="max-height: 300px; overflow-y: auto; display: none;">
+        <p style="text-align: center; color: #999;">Loading sessions...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Password Modal -->
+  <div id="passwordModal" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+  ">
+    <div style="
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      max-width: 400px;
+      width: 90%;
+    ">
+      <h3 style="margin-top: 0; color: #333;" id="modalTitle">Enter Admin Code</h3>
+      <input
+        type="password"
+        id="passwordInput"
+        placeholder="Enter code"
+        style="
+          width: 100%;
+          padding: 0.8rem;
+          border: 2px solid #e0e0e0;
+          border-radius: 8px;
+          font-size: 1rem;
+          box-sizing: border-box;
+          margin-bottom: 1rem;
+        "
+      />
+      <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+        <button id="modalCancel" style="background: #999;">Cancel</button>
+        <button id="modalSubmit">Submit</button>
+      </div>
+    </div>
   </div>
 
   <script>
+    // Show password modal and return promise with entered code
+    function showPasswordModal(title = 'Enter Admin Code') {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('passwordModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const passwordInput = document.getElementById('passwordInput');
+        const submitBtn = document.getElementById('modalSubmit');
+        const cancelBtn = document.getElementById('modalCancel');
+
+        modalTitle.textContent = title;
+        passwordInput.value = '';
+        modal.style.display = 'flex';
+        passwordInput.focus();
+
+        function cleanup() {
+          modal.style.display = 'none';
+          submitBtn.removeEventListener('click', handleSubmit);
+          cancelBtn.removeEventListener('click', handleCancel);
+          passwordInput.removeEventListener('keypress', handleKeypress);
+        }
+
+        function handleSubmit() {
+          const code = passwordInput.value;
+          cleanup();
+          resolve(code);
+        }
+
+        function handleCancel() {
+          cleanup();
+          resolve(null);
+        }
+
+        function handleKeypress(e) {
+          if (e.key === 'Enter') {
+            handleSubmit();
+          } else if (e.key === 'Escape') {
+            handleCancel();
+          }
+        }
+
+        submitBtn.addEventListener('click', handleSubmit);
+        cancelBtn.addEventListener('click', handleCancel);
+        passwordInput.addEventListener('keypress', handleKeypress);
+      });
+    }
+
+    // Load and display sessions list (requires admin code)
+    async function loadSessions(adminCode) {
+      try {
+        const res = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminCode })
+        });
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            document.getElementById('sessionsList').innerHTML = '<p style="text-align: center; color: #f5576c;">Invalid admin code</p>';
+          } else {
+            document.getElementById('sessionsList').innerHTML = '<p style="text-align: center; color: #f5576c;">Error loading sessions</p>';
+          }
+          return;
+        }
+
+        const sessions = await res.json();
+        const listContainer = document.getElementById('sessionsList');
+
+        if (sessions.length === 0) {
+          listContainer.innerHTML = '<p style="text-align: center; color: #999;">No previous sessions</p>';
+          return;
+        }
+
+        listContainer.innerHTML = sessions.map(session => `
+          <div style="
+            background: #f5f5f5;
+            padding: 0.8rem;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          ">
+            <div style="flex-grow: 1;">
+              <div style="font-weight: bold; color: #333;">${session.name || 'Unnamed Session'}</div>
+              <div style="font-size: 0.85rem; color: #666; margin-top: 0.2rem;">
+                ID: <span style="font-family: monospace; background: #e0e0e0; padding: 2px 6px; border-radius: 3px;">${session.id}</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button onclick="openSession('${session.id}')" style="background: #2d7dd2; padding: 0.4rem 0.8rem; font-size: 0.9rem;">
+                Open
+              </button>
+              <button onclick="deleteSession('${session.id}', '${session.name || 'Unnamed Session'}')" style="background: #dc3545; padding: 0.4rem 0.8rem; font-size: 0.9rem;">
+                🗑️
+              </button>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error('Error loading sessions:', err);
+        document.getElementById('sessionsList').innerHTML = '<p style="text-align: center; color: #f5576c;">Error loading sessions</p>';
+      }
+    }
+
+    // Admin login to view sessions
+    document.getElementById('adminLoginBtn').addEventListener('click', async () => {
+      const adminCode = await showPasswordModal('Enter Admin Code to View Sessions');
+      if (!adminCode) return;
+
+      try {
+        const res = await fetch('/api/admin/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: adminCode })
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+          document.getElementById('adminLoginBtn').style.display = 'none';
+          document.getElementById('sessionsList').style.display = 'block';
+          loadSessions(adminCode);
+        } else {
+          alert('Invalid admin code');
+        }
+      } catch (err) {
+        console.error('Error verifying admin code:', err);
+        alert('Error verifying admin code');
+      }
+    });
+
+    // Open a session (with admin flag)
+    function openSession(sessionId) {
+      window.location.href = `/session/${sessionId}?from=admin`;
+    }
+
+    // Delete a session with confirmation (requires admin code each time)
+    async function deleteSession(sessionId, sessionName) {
+      const adminCode = await showPasswordModal('Enter Admin Code to Delete');
+      if (!adminCode) return;
+
+      if (!confirm(`Are you sure you want to delete "${sessionName}"?\n\nThis action cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/session/${sessionId}`, {
+          method: 'DELETE',
+          headers: {
+            'x-admin-code': adminCode
+          }
+        });
+
+        if (res.status === 401) {
+          alert('Invalid admin code');
+          return;
+        }
+
+        if (res.ok) {
+          loadSessions(adminCode); // Refresh the list
+        } else {
+          alert('Failed to delete session');
+        }
+      } catch (err) {
+        console.error('Error deleting session:', err);
+        alert('Error deleting session');
+      }
+    }
+
     document.getElementById('createBtn').addEventListener('click', async () => {
       const name = document.getElementById('sessionName').value.trim();
       try {

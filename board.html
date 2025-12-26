@@ -14,9 +14,44 @@
       <button id="copyIdBtn">📋 Copy ID</button>
     </div>
   </div>
+
+  <!-- Timer Display -->
+  <div id="timerContainer" style="text-align: center; margin: 1rem 0;">
+    <div id="timerDisplay" style="
+      font-size: 3rem;
+      font-weight: bold;
+      color: white;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      display: inline-block;
+      min-width: 200px;
+    ">
+      00:00
+    </div>
+
+    <div id="timerControls" style="margin-top: 1rem;">
+      <input
+        type="number"
+        id="timerDurationInput"
+        placeholder="Minutes"
+        min="1"
+        max="120"
+        style="width: 80px; padding: 0.5rem; margin-right: 0.5rem; border-radius: 4px; border: 1px solid #ccc;"
+      />
+      <button id="startTimerBtn">▶️ Start</button>
+      <button id="pauseTimerBtn" style="display: none;">⏸️ Pause</button>
+      <button id="resumeTimerBtn" style="display: none;">▶️ Resume</button>
+      <button id="resetTimerBtn" style="display: none;">🔄 Reset</button>
+    </div>
+  </div>
+
   <div class="button-container">
     <button id="downloadBtn">📥 Download Board</button>
     <button id="jiraBtn">📋 Export JIRA Markup</button>
+    <button id="deleteSessionBtn" style="display: none; background: #dc3545;">🗑️ Delete Session</button>
   </div>
   <div class="board">
     <div class="column" id="went-well">
@@ -38,6 +73,49 @@
       <h2>🛠 Action Items</h2>
       <ul id="list-action-items"></ul>
       <form data-category="action-items"><textarea placeholder="Add item" rows="2"></textarea><button type="submit">Add</button></form>
+    </div>
+  </div>
+
+  <!-- Password Modal -->
+  <div id="passwordModal" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+  ">
+    <div style="
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      max-width: 400px;
+      width: 90%;
+    ">
+      <h3 style="margin-top: 0; color: #333;" id="modalTitle">Enter Admin Code</h3>
+      <input
+        type="password"
+        id="passwordInput"
+        placeholder="Enter code"
+        style="
+          width: 100%;
+          padding: 0.8rem;
+          border: 2px solid #e0e0e0;
+          border-radius: 8px;
+          font-size: 1rem;
+          box-sizing: border-box;
+          margin-bottom: 1rem;
+        "
+      />
+      <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+        <button id="modalCancel" style="background: #999;">Cancel</button>
+        <button id="modalSubmit">Submit</button>
+      </div>
     </div>
   </div>
 

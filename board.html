@@ -33,15 +33,16 @@
     </div>
 
     <div id="timerControls" style="margin-top: 1rem;">
+      <button id="unlockTimerBtn">🔒 Unlock Timer Controls</button>
       <input
         type="number"
         id="timerDurationInput"
         placeholder="Minutes"
         min="1"
         max="120"
-        style="width: 80px; padding: 0.5rem; margin-right: 0.5rem; border-radius: 4px; border: 1px solid #ccc;"
+        style="width: 80px; padding: 0.5rem; margin-right: 0.5rem; border-radius: 4px; border: 1px solid #ccc; display: none;"
       />
-      <button id="startTimerBtn">▶️ Start</button>
+      <button id="startTimerBtn" style="display: none;">▶️ Start</button>
       <button id="pauseTimerBtn" style="display: none;">⏸️ Pause</button>
       <button id="resumeTimerBtn" style="display: none;">▶️ Resume</button>
       <button id="resetTimerBtn" style="display: none;">🔄 Reset</button>

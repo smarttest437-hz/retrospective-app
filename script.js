@@ -1,4 +1,5 @@
 let isEditing = false; // Track if user is editing
+let isAdmin = sessionStorage.getItem('timerAdmin') === 'true';
 
 // Show password modal and return promise with entered code
 function showPasswordModal(title = 'Enter Admin Code') {
@@ -446,9 +447,21 @@ function updateTimerControls(state) {
   const pauseBtn = document.getElementById('pauseTimerBtn');
   const resumeBtn = document.getElementById('resumeTimerBtn');
   const resetBtn = document.getElementById('resetTimerBtn');
+  const unlockBtn = document.getElementById('unlockTimerBtn');
 
   if (!durationInput || !startBtn || !pauseBtn || !resumeBtn || !resetBtn) return;
 
+  if (!isAdmin) {
+    durationInput.style.display = 'none';
+    startBtn.style.display = 'none';
+    pauseBtn.style.display = 'none';
+    resumeBtn.style.display = 'none';
+    resetBtn.style.display = 'none';
+    if (unlockBtn) unlockBtn.style.display = 'inline-block';
+    return;
+  }
+
+  if (unlockBtn) unlockBtn.style.display = 'none';
   durationInput.style.display = state === 'stopped' ? 'inline-block' : 'none';
   startBtn.style.display = state === 'stopped' ? 'inline-block' : 'none';
   pauseBtn.style.display = state === 'running' ? 'inline-block' : 'none';
@@ -507,7 +520,7 @@ function playExpiredAlert() {
   }
 }
 
-// Sync timer from server (called from loadSessionInfo)
+// Sync timer from server (called on load and every 3s poll)
 function syncTimer(timer) {
   if (!timer) {
     timer = {
@@ -519,17 +532,65 @@ function syncTimer(timer) {
     };
   }
 
-  timerState = timer;
-  audioAlertPlayed = timer.state === 'expired'; // Reset alert if coming from other state
-
   const remaining = calculateRemainingSeconds(timer);
-  updateTimerDisplay(remaining, timer.state);
-  updateTimerControls(timer.state);
+  // Server may still say 'running' after time elapses — treat locally as expired
+  const effectiveState = (timer.state === 'running' && remaining <= 0) ? 'expired' : timer.state;
 
-  if (timer.state === 'running') {
+  timerState = { ...timer, state: effectiveState };
+
+  updateTimerDisplay(remaining, effectiveState);
+  updateTimerControls(effectiveState);
+
+  if (effectiveState === 'running') {
+    audioAlertPlayed = false;
     startLocalCountdown();
   } else {
     if (timerInterval) clearInterval(timerInterval);
+    if (effectiveState === 'expired' && !audioAlertPlayed) {
+      audioAlertPlayed = true;
+      playExpiredAlert();
+    }
+  }
+}
+
+// Unlock timer controls with admin code (persists for this tab session)
+function setupTimerAdminUnlock() {
+  const unlockBtn = document.getElementById('unlockTimerBtn');
+  if (!unlockBtn) return;
+
+  unlockBtn.addEventListener('click', async () => {
+    const code = await showPasswordModal('Enter Admin Code to Control Timer');
+    if (!code) return;
+
+    try {
+      const res = await fetch('/api/admin/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      const result = await res.json();
+      if (result.success) {
+        isAdmin = true;
+        sessionStorage.setItem('timerAdmin', 'true');
+        updateTimerControls(timerState.state);
+      } else {
+        alert('Invalid admin code');
+      }
+    } catch (err) {
+      alert('Error verifying admin code');
+    }
+  });
+}
+
+// Poll timer state every 3 seconds so all users stay in sync
+async function pollTimerState() {
+  try {
+    const res = await fetch(`/api/session/${sessionId}`);
+    if (!res.ok) return;
+    const session = await res.json();
+    syncTimer(session.timer);
+  } catch (err) {
+    // Ignore transient polling errors
   }
 }
 
@@ -640,7 +701,9 @@ function init() {
   loadSessionInfo();
   setupCopySessionId();
   setupTimerHandlers();
+  setupTimerAdminUnlock();
   setupFormSubmission();
   loadItems();
-  setInterval(loadItems, 10000); // auto-refresh every 10 seconds
+  setInterval(loadItems, 10000);
+  setInterval(pollTimerState, 3000);
 }

@@ -25,7 +25,7 @@ function generateSessionId() {
 }
 
 // Admin code from environment variable (default: admin437)
-const ADMIN_CODE = process.env.ADMIN_CODE || "admin437";
+const ADMIN_CODE = process.env.ADMIN_CODE || "11111";
 
 // Session management routes
 
